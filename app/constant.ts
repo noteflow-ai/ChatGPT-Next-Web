@@ -243,6 +243,19 @@ export const Bedrock = {
   ApiVersion: "2023-11-01",
   getEndpoint: (region: string = "us-west-2") =>
     `https://bedrock-runtime.${region}.amazonaws.com`,
+  ImageModels: {
+    StableDiffusion: {
+      XL: "stability.stable-diffusion-xl",
+      XLV1: "stability.stable-diffusion-xl-v1",
+    },
+    Titan: {
+      V1: "amazon.titan-image-generator-v1",
+      V2: "amazon.titan-image-generator-v2:0",
+    },
+    NovaCanvas: {
+      V1: "amazon.nova-canvas-v1:0",
+    },
+  },
 };
 // Get the region from access store for BEDROCK_BASE_URL
 export const BEDROCK_BASE_URL = Bedrock.getEndpoint();
@@ -592,7 +605,6 @@ export const DEFAULT_MODELS = [
 export const CHAT_PAGE_SIZE = 15;
 export const MAX_RENDER_MSG_COUNT = 45;
 
-// some famous webdav endpoints
 export const internalAllowedWebDavEndpoints = [
   "https://dav.jianguoyun.com/dav/",
   "https://dav.dropdav.com/",

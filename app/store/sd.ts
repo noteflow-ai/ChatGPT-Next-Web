@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { uploadImage, base64Image2Blob } from "@/app/utils/chat";
 import { models, getModelParamBasicData } from "@/app/components/sd/sd-panel";
 import { useAccessStore } from "./access";
+import { BedrockApi } from "@/app/client/platforms/bedrock";
 
 const defaultModel = {
   name: models[0].name,
@@ -56,10 +57,33 @@ export const useSdStore = createPersistStore<
         return id;
       },
       sendTask(data: any, okCall?: Function) {
+        const currentModel = _get().currentModel;
+        const currentParams = _get().currentParams;
+
         data = { ...data, id: nanoid(), status: "running" };
         set({ draw: [data, ..._get().draw] });
         this.getNextId();
-        this.stabilityRequestCall(data);
+        console.log("Sending Bedrock model:", currentModel.value);
+        console.log("Sending Bedrock request with model:", currentParams.model);
+
+        // Handle different model types
+        if (
+          currentModel.value === "bedrock-sd" ||
+          currentModel.value === "bedrock-titan" ||
+          currentModel.value === "bedrock-nova"
+        ) {
+          const modelData = {
+            ...data,
+            params: {
+              ...data.params,
+              model: currentParams.model, // Use the selected model from currentParams
+            },
+          };
+          this.bedrockRequestCall(modelData);
+        } else {
+          this.stabilityRequestCall(data);
+        }
+
         okCall?.();
       },
       stabilityRequestCall(data: any) {
@@ -133,6 +157,47 @@ export const useSdStore = createPersistStore<
             console.error("Error:", error);
             this.getNextId();
           });
+      },
+      async bedrockRequestCall(data: any) {
+        try {
+          const bedrockApi = new BedrockApi();
+          const result = await bedrockApi.generateImage(data.params);
+
+          if (result.base64) {
+            const self = this;
+            uploadImage(base64Image2Blob(result.base64, "image/png"))
+              .then((img_data) => {
+                console.debug("uploadImage success", img_data, self);
+                self.updateDraw({
+                  ...data,
+                  status: "success",
+                  img_data,
+                });
+              })
+              .catch((e) => {
+                console.error("uploadImage error", e);
+                self.updateDraw({
+                  ...data,
+                  status: "error",
+                  error: JSON.stringify(e),
+                });
+              });
+          } else {
+            this.updateDraw({
+              ...data,
+              status: "error",
+              error: "No image data in response",
+            });
+          }
+        } catch (error) {
+          this.updateDraw({
+            ...data,
+            status: "error",
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+          console.error("Bedrock Error:", error);
+        }
+        this.getNextId();
       },
       updateDraw(_draw: any) {
         const draw = _get().draw || [];

@@ -10,7 +10,7 @@ import { getServerSideConfig } from "../config/server";
 import { ModelProvider } from "../constant";
 import { prettyObject } from "../utils/format";
 
-const ALLOWED_PATH = new Set(["chat", "models"]);
+const ALLOWED_PATH = new Set(["chat", "models", "images"]);
 
 async function getBedrockCredentials(
   req: NextRequest,
@@ -83,15 +83,22 @@ async function requestBedrock(req: NextRequest) {
       throw new Error(`Invalid JSON in request body: ${e}`);
     }
     console.log("[Bedrock Request] Initiating request");
+
     // Get endpoint and prepare request
     const endpoint = getBedrockEndpoint(
       credentials.region,
       modelId,
       shouldStream,
     );
-    const requestBody: any = {
-      ...bodyJson,
-    };
+
+    // // Handle image generation models
+    // if (modelId.includes("stability.stable-diffusion") || modelId.includes("amazon.titan-image")) {
+    //   bodyJson = {
+    //     ...bodyJson,
+    //     accept: "image/png",
+    //   };
+    // }
+
     // Sign request
     const headers = await sign({
       method: "POST",
@@ -99,20 +106,20 @@ async function requestBedrock(req: NextRequest) {
       region: credentials.region,
       accessKeyId: credentials.accessKeyId,
       secretAccessKey: credentials.secretAccessKey,
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify(bodyJson),
       service: "bedrock",
       isStreaming: shouldStream,
     });
 
     // Make request to AWS Bedrock
-    // console.log(
-    //   "[Bedrock Request] Final Body:",
-    //   JSON.stringify(requestBody, null, 2),
-    // );
+    console.log(
+      "[Bedrock Request] Final Body:",
+      JSON.stringify(bodyJson, null, 2),
+    );
     const res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify(bodyJson),
       redirect: "manual",
       // @ts-ignore
       duplex: "half",

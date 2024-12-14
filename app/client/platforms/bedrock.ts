@@ -108,6 +108,132 @@ export class BedrockApi implements LLMApi {
     throw new Error("Speech not implemented for Bedrock.");
   }
 
+  formatImageRequestBody(params: any) {
+    const model = params.model;
+    console.log("====params.model", model);
+
+    // Handle Bedrock Stable Diffusion
+    if (model.includes("stability.stable-diffusion")) {
+      const [width, height] = params.size.split("x").map(Number);
+      return {
+        text_prompts: [
+          {
+            text: params.prompt,
+            weight: 1.0,
+          },
+          ...(params.negative_prompt
+            ? [{ text: params.negative_prompt, weight: -1.0 }]
+            : []),
+        ],
+        cfg_scale: params.cfg_scale || 7,
+        steps: params.steps || 50,
+        seed: params.seed || 0,
+        style_preset: params.style_preset || "photographic",
+        width,
+        height,
+      };
+    }
+
+    // Handle Bedrock Titan Image
+    if (model.includes("amazon.titan-image")) {
+      const [width, height] = params.size.split("x").map(Number);
+      const cfgScale = Math.min(
+        Math.max(parseFloat(params.cfg_scale) || 7.5, 1.1),
+        10.0,
+      );
+
+      return {
+        taskType: "TEXT_IMAGE",
+        textToImageParams: {
+          text: params.prompt,
+          negativeText:
+            params.negative_prompt ||
+            "blurry, distorted, low resolution, pixelated, overexposed, underexposed, dark, grainy, noisy, watermark",
+        },
+        imageGenerationConfig: {
+          numberOfImages: 1,
+          quality: params.quality || "standard",
+          height: height || 768,
+          width: width || 1280,
+          cfgScale: cfgScale,
+          seed: params.seed || Math.floor(Math.random() * 214783647),
+        },
+      };
+    }
+
+    // Handle Nova Canvas
+    if (model.includes("amazon.nova-canvas")) {
+      const [width, height] = params.size.split("x").map(Number);
+
+      return {
+        taskType: "TEXT_IMAGE",
+        textToImageParams: {
+          text: params.prompt,
+          negativeText:
+            params.negative_prompt ||
+            "blurry, distorted, low resolution, pixelated, overexposed, underexposed, dark, grainy, noisy, watermark",
+        },
+        imageGenerationConfig: {
+          width: width || 1024,
+          height: height || 1024,
+          quality: params.quality || "standard",
+          seed: params.seed || Math.floor(Math.random() * 214783647),
+          numberOfImages: 1,
+        },
+      };
+    }
+
+    throw new Error(`Unsupported image model: ${model}`);
+  }
+
+  async generateImage(params: any) {
+    try {
+      const requestBody = this.formatImageRequestBody(params);
+      const bedrockAPIPath = `${BEDROCK_BASE_URL}/model/${params.model}/invoke`;
+      const imagePath = isApp ? bedrockAPIPath : ApiPath.Bedrock + "/images";
+
+      const headers = await getBedrockHeaders(
+        params.model,
+        imagePath,
+        JSON.stringify(requestBody),
+        false,
+      );
+
+      const res = await fetch(imagePath, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to generate image: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+
+      // Extract image data based on model
+      let imageData;
+      if (params.model.includes("stability.stable-diffusion")) {
+        imageData = data.artifacts?.[0]?.base64;
+      } else if (params.model.includes("amazon.titan-image")) {
+        imageData = data.images?.[0];
+      } else if (params.model.includes("amazon.nova-canvas")) {
+        imageData = data.images?.[0];
+      }
+
+      if (!imageData) {
+        throw new Error("No image data in response");
+      }
+
+      return {
+        base64: imageData,
+      };
+    } catch (e) {
+      console.error("[Bedrock Image Generation Error]:", e);
+      throw e;
+    }
+  }
+
   formatRequestBody(messages: ChatOptions["messages"], modelConfig: any) {
     const model = modelConfig.model;
     const visionModel = isVisionModel(modelConfig.model);

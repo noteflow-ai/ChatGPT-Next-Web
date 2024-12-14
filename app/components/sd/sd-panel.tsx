@@ -5,6 +5,7 @@ import { IconButton } from "@/app/components/button";
 import Locale from "@/app/locales";
 import { useSdStore } from "@/app/store/sd";
 import clsx from "clsx";
+import { Bedrock } from "@/app/constant";
 
 export const params = [
   {
@@ -26,17 +27,67 @@ export const params = [
       { name: "SD3 Large Turbo", value: "sd3-large-turbo" },
     ],
   },
+  // Add Bedrock SD model options
+  {
+    name: "Bedrock Model Version",
+    value: "model",
+    type: "select",
+    default: Bedrock.ImageModels.StableDiffusion.XL,
+    support: ["bedrock-sd"],
+    options: [
+      {
+        name: "Stable Diffusion XL",
+        value: Bedrock.ImageModels.StableDiffusion.XL,
+      },
+      {
+        name: "Stable Diffusion XL 1.0",
+        value: Bedrock.ImageModels.StableDiffusion.XLV1,
+      },
+    ],
+  },
+  // Add Bedrock Titan model options
+  {
+    name: "Titan Model Version",
+    value: "model",
+    type: "select",
+    default: Bedrock.ImageModels.Titan.V1,
+    support: ["bedrock-titan"],
+    options: [
+      { name: "Titan Image Generator v1", value: Bedrock.ImageModels.Titan.V1 },
+      { name: "Titan Image Generator v2", value: Bedrock.ImageModels.Titan.V2 },
+    ],
+  },
+  // Add Nova Canvas model options
+  {
+    name: "Nova Canvas Model Version",
+    value: "model",
+    type: "select",
+    default: Bedrock.ImageModels.NovaCanvas.V1,
+    support: ["bedrock-nova"],
+    options: [
+      { name: "Nova Canvas v1", value: Bedrock.ImageModels.NovaCanvas.V1 },
+    ],
+  },
   {
     name: Locale.SdPanel.NegativePrompt,
     value: "negative_prompt",
     type: "textarea",
     placeholder: Locale.SdPanel.PleaseInput(Locale.SdPanel.NegativePrompt),
+    support: [
+      "ultra",
+      "core",
+      "sd3",
+      "bedrock-sd",
+      "bedrock-titan",
+      "bedrock-nova",
+    ],
   },
   {
     name: Locale.SdPanel.AspectRatio,
     value: "aspect_ratio",
     type: "select",
     default: "1:1",
+    support: ["ultra", "core", "sd3"],
     options: [
       { name: "1:1", value: "1:1" },
       { name: "16:9", value: "16:9" },
@@ -47,6 +98,19 @@ export const params = [
       { name: "5:4", value: "5:4" },
       { name: "9:16", value: "9:16" },
       { name: "9:21", value: "9:21" },
+    ],
+  },
+  // Add Bedrock size options
+  {
+    name: "Image Size",
+    value: "size",
+    type: "select",
+    default: "1024x1024",
+    support: ["bedrock-sd", "bedrock-titan", "bedrock-nova"],
+    options: [
+      { name: "1024x1024", value: "1024x1024" },
+      { name: "1024x1792", value: "1024x1792" },
+      { name: "1792x1024", value: "1792x1024" },
     ],
   },
   {
@@ -78,13 +142,111 @@ export const params = [
       { name: Locale.SdPanel.Styles.TileTexture, value: "tile-texture" },
     ],
   },
+  // Add Bedrock style preset options
+  {
+    name: "Style Preset",
+    value: "style_preset",
+    type: "select",
+    default: "photographic",
+    support: ["bedrock-sd"],
+    options: [
+      { name: "3D Model", value: "3d-model" },
+      { name: "Analog Film", value: "analog-film" },
+      { name: "Anime", value: "anime" },
+      { name: "Cinematic", value: "cinematic" },
+      { name: "Comic Book", value: "comic-book" },
+      { name: "Digital Art", value: "digital-art" },
+      { name: "Enhance", value: "enhance" },
+      { name: "Fantasy Art", value: "fantasy-art" },
+      { name: "Isometric", value: "isometric" },
+      { name: "Line Art", value: "line-art" },
+      { name: "Low Poly", value: "low-poly" },
+      { name: "Modeling Compound", value: "modeling-compound" },
+      { name: "Neon Punk", value: "neon-punk" },
+      { name: "Origami", value: "origami" },
+      { name: "Photographic", value: "photographic" },
+      { name: "Pixel Art", value: "pixel-art" },
+      { name: "Tile Texture", value: "tile-texture" },
+    ],
+  },
   {
     name: "Seed",
     value: "seed",
     type: "number",
     default: 0,
     min: 0,
-    max: 4294967294,
+    max: 214783647,
+    support: [
+      "ultra",
+      "core",
+      "sd3",
+      "bedrock-sd",
+      "bedrock-titan",
+      "bedrock-nova",
+    ],
+  },
+  // Add Bedrock specific parameters
+  {
+    name: "CFG Scale",
+    value: "cfg_scale",
+    type: "number",
+    default: 7,
+    min: 0,
+    max: 35,
+    support: ["bedrock-sd"],
+  },
+  // Add Titan specific CFG Scale
+  {
+    name: "CFG Scale",
+    value: "cfg_scale",
+    type: "number",
+    default: 7.5,
+    min: 1.1,
+    max: 10.0,
+    step: 0.1,
+    support: ["bedrock-titan"],
+  },
+  // Add Nova Canvas specific parameters
+  {
+    name: "Quality",
+    value: "quality",
+    type: "select",
+    default: "standard",
+    support: ["bedrock-nova"],
+    options: [
+      { name: "Standard", value: "standard" },
+      { name: "Premium", value: "premium" },
+    ],
+  },
+  {
+    name: "Steps",
+    value: "steps",
+    type: "number",
+    default: 50,
+    min: 10,
+    max: 150,
+    support: ["bedrock-sd"],
+  },
+  // Add Titan specific parameters
+  {
+    name: "Quality",
+    value: "quality",
+    type: "select",
+    default: "standard",
+    support: ["bedrock-titan"],
+    options: [
+      { name: "Standard", value: "standard" },
+      { name: "Premium", value: "premium" },
+    ],
+  },
+  {
+    name: "Number of Images",
+    value: "numberOfImages",
+    type: "number",
+    default: 1,
+    min: 1,
+    max: 5,
+    support: ["bedrock-titan", "bedrock-nova"],
   },
   {
     name: Locale.SdPanel.OutFormat,
@@ -126,6 +288,22 @@ export const models = [
         );
       });
     },
+  },
+  // Add Bedrock models
+  {
+    name: "Bedrock Stable Diffusion",
+    value: "bedrock-sd",
+    params: (data: any) => sdCommonParams("bedrock-sd", data),
+  },
+  {
+    name: "Bedrock Titan Image",
+    value: "bedrock-titan",
+    params: (data: any) => sdCommonParams("bedrock-titan", data),
+  },
+  {
+    name: "Bedrock Nova Canvas",
+    value: "bedrock-nova",
+    params: (data: any) => sdCommonParams("bedrock-nova", data),
   },
 ];
 
@@ -222,9 +400,13 @@ export function ControlParam(props: {
                   type="number"
                   min={item.min}
                   max={item.max}
+                  step={item.step || 1}
                   value={props.data[item.value] || 0}
                   onChange={(e) => {
-                    props.onChange(item.value, parseInt(e.currentTarget.value));
+                    const value = item.step
+                      ? parseFloat(e.currentTarget.value)
+                      : parseInt(e.currentTarget.value);
+                    props.onChange(item.value, value);
                   }}
                 />
               </ControlParamItem>
@@ -269,6 +451,7 @@ export const getModelParamBasicData = (
       newParams[item.value] = data[item.value] || item.default || "";
     }
   });
+  console.log("getModelParamBasicData===========:", newParams);
   return newParams;
 };
 
@@ -284,14 +467,36 @@ export function SdPanel() {
   const setParams = sdStore.setCurrentParams;
 
   const handleValueChange = (field: string, val: any) => {
-    setParams({
+    console.log("handleValueChange==========:", field, val);
+    const updatedParams = {
       ...params,
       [field]: val,
-    });
+    };
+    setParams(updatedParams);
   };
+
   const handleModelChange = (model: any) => {
     setCurrentModel(model);
-    setParams(getModelParamBasicData(model.params({}), params));
+    console.log("Set model==========:", model);
+
+    // Get model parameters for this model type
+    const modelParams = model.params({});
+
+    // Find the model version parameter from the model's parameters
+    const modelVersionParam = modelParams.find(
+      (p: { value: string }) => p.value === "model",
+    );
+
+    // Get the default model version for this model type
+    const defaultModelVersion = modelVersionParam?.default || model.value;
+
+    // Update params with both the model type and its default version
+    const updatedParams = {
+      ...params,
+      model: defaultModelVersion, // Use the specific model version instead of model type
+    };
+
+    setParams(updatedParams);
   };
 
   return (
