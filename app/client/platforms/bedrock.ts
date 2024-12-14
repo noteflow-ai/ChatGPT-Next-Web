@@ -151,7 +151,7 @@ export class BedrockApi implements LLMApi {
             "blurry, distorted, low resolution, pixelated, overexposed, underexposed, dark, grainy, noisy, watermark",
         },
         imageGenerationConfig: {
-          numberOfImages: 1,
+          numberOfImages: params.numberOfImages || 1,
           quality: params.quality || "standard",
           height: height || 768,
           width: width || 1280,
@@ -178,7 +178,7 @@ export class BedrockApi implements LLMApi {
           height: height || 1024,
           quality: params.quality || "standard",
           seed: params.seed || Math.floor(Math.random() * 214783647),
-          numberOfImages: 1,
+          numberOfImages: params.numberOfImages || 1,
         },
       };
     }
