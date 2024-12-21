@@ -9,7 +9,12 @@ import {
 } from "@/app/store";
 import { preProcessImageContent } from "@/app/utils/chat";
 import { getMessageTextContent, isVisionModel } from "@/app/utils";
-import { ApiPath, BEDROCK_BASE_URL, REQUEST_TIMEOUT_MS } from "@/app/constant";
+import {
+  ApiPath,
+  BEDROCK_BASE_URL,
+  REQUEST_TIMEOUT_MS,
+  Bedrock,
+} from "@/app/constant";
 import { getClientConfig } from "@/app/config/client";
 import {
   extractMessage,
@@ -49,6 +54,7 @@ async function getBedrockHeaders(
   chatPath: string,
   finalRequestBody: any,
   shouldStream: boolean,
+  isAsync: boolean = false,
 ): Promise<Record<string, string>> {
   const accessStore = useAccessStore.getState();
   const bedrockHeaders = isApp
@@ -73,6 +79,7 @@ async function getBedrockHeaders(
       XModelID: modelId,
       XEncryptionKey: encryptionKey,
       ShouldStream: String(shouldStream),
+      IsAsync: String(isAsync),
       Authorization: await createAuthHeader(
         awsRegion,
         awsAccessKey,
@@ -102,46 +109,127 @@ async function createAuthHeader(
 
   return `Bearer ${encryptedValues.join(":")}`;
 }
-
 export class BedrockApi implements LLMApi {
   speech(options: SpeechOptions): Promise<ArrayBuffer> {
     throw new Error("Speech not implemented for Bedrock.");
   }
 
+  async checkVideoStatus(invocationArn: string) {
+    try {
+      const bedrockAPIPath = `${BEDROCK_BASE_URL}/async-invoke/${invocationArn}`;
+      const statusPath = isApp
+        ? bedrockAPIPath
+        : ApiPath.Bedrock + "/async-invoke";
+
+      const headers = await getBedrockHeaders(
+        "amazon.nova-reel-v1:0",
+        statusPath,
+        "",
+        false,
+        true, // Set isAsync to true for video status check
+      );
+
+      const res = await fetch(statusPath, {
+        method: "GET",
+        headers,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to check video status: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+
+      return {
+        status: data.status, // "Completed", "InProgress", or "Failed"
+        s3Output: {
+          manifestPath: data.outputMetadata?.manifestS3Path, // Path to manifest.json
+          videoPath: data.outputMetadata?.videoS3Path, // Path to output.mp4
+        },
+        error: data.failureReason, // Error message if status is "Failed"
+        completionTime: data.completionTime, // Timestamp when the job completed
+        requestTime: data.requestTime, // Timestamp when the job was requested
+      };
+    } catch (e) {
+      console.error("[Bedrock Video Status Check Error]:", e);
+      throw e;
+    }
+  }
+
   formatImageRequestBody(params: any) {
     const model = params.model;
-    console.log("====params.model", model);
 
     // Handle Bedrock Stable Diffusion
-    if (model.includes("stability.stable-diffusion")) {
-      const [width, height] = params.size.split("x").map(Number);
+    if (model.includes("stability")) {
       return {
-        text_prompts: [
-          {
-            text: params.prompt,
-            weight: 1.0,
-          },
-          ...(params.negative_prompt
-            ? [{ text: params.negative_prompt, weight: -1.0 }]
-            : []),
-        ],
-        cfg_scale: params.cfg_scale || 7,
-        steps: params.steps || 50,
+        prompt: params.prompt,
+        negative_prompt: params.negative_prompt || "",
+        mode: "text-to-image",
         seed: params.seed || 0,
-        style_preset: params.style_preset || "photographic",
-        width,
-        height,
+        aspect_ratio: params.aspectRatio || "1:1",
+        output_format: params.output_format || "png",
       };
     }
 
-    // Handle Bedrock Titan Image
+    // Handle Nova Reel video generation
+    if (model.includes("amazon.nova-reel")) {
+      interface ImageSource {
+        format: "jpeg" | "png";
+        source: {
+          bytes: string;
+        };
+      }
+
+      interface NovaReelRequest {
+        taskType: "TEXT_VIDEO";
+        textToVideoParams: {
+          text: string;
+          images?: ImageSource[];
+        };
+        videoGenerationConfig: {
+          durationSeconds: number;
+          fps: number;
+          dimension: string;
+          seed: number;
+        };
+      }
+
+      const requestBody: NovaReelRequest = {
+        taskType: "TEXT_VIDEO",
+        textToVideoParams: {
+          text: params.prompt,
+          ...(params.images?.[0] && {
+            images: [
+              {
+                format: params.images[0].format || "jpeg",
+                source: {
+                  bytes: params.images[0].base64,
+                },
+              },
+            ],
+          }),
+        },
+        videoGenerationConfig: {
+          durationSeconds: 6,
+          fps: 24,
+          dimension: "1280x720",
+          seed: params.seed || 12,
+        },
+      };
+
+      return {
+        body: requestBody,
+        outputConfig: {
+          s3OutputDataConfig: {
+            s3Uri: params.s3OutputPath || "s3://nova-test-videos-us-west-2",
+          },
+        },
+      };
+    }
+
+    // Handle Titan image generation
     if (model.includes("amazon.titan-image")) {
       const [width, height] = params.size.split("x").map(Number);
-      const cfgScale = Math.min(
-        Math.max(parseFloat(params.cfg_scale) || 7.5, 1.1),
-        10.0,
-      );
-
       return {
         taskType: "TEXT_IMAGE",
         textToImageParams: {
@@ -155,16 +243,18 @@ export class BedrockApi implements LLMApi {
           quality: params.quality || "standard",
           height: height || 768,
           width: width || 1280,
-          cfgScale: cfgScale,
+          cfgScale: Math.min(
+            Math.max(parseFloat(params.cfg_scale) || 7.5, 1.1),
+            10.0,
+          ),
           seed: params.seed || Math.floor(Math.random() * 214783647),
         },
       };
     }
 
-    // Handle Nova Canvas
+    // Handle Nova Canvas image generation
     if (model.includes("amazon.nova-canvas")) {
       const [width, height] = params.size.split("x").map(Number);
-
       return {
         taskType: "TEXT_IMAGE",
         textToImageParams: {
@@ -189,14 +279,22 @@ export class BedrockApi implements LLMApi {
   async generateImage(params: any) {
     try {
       const requestBody = this.formatImageRequestBody(params);
-      const bedrockAPIPath = `${BEDROCK_BASE_URL}/model/${params.model}/invoke`;
-      const imagePath = isApp ? bedrockAPIPath : ApiPath.Bedrock + "/images";
+      const isVideoRequest =
+        params.model === Bedrock.ImageModels.NovaCanvasAndReel.NovaReel;
+
+      const bedrockAPIPath = `${BEDROCK_BASE_URL}/model/${params.model}/${
+        isVideoRequest ? "start-async-invoke" : "invoke"
+      }`;
+      const imagePath = isApp
+        ? bedrockAPIPath
+        : ApiPath.Bedrock + (isVideoRequest ? "/async-invoke" : "/images");
 
       const headers = await getBedrockHeaders(
         params.model,
         imagePath,
         JSON.stringify(requestBody),
         false,
+        isVideoRequest, // Pass isVideoRequest as isAsync parameter
       );
 
       const res = await fetch(imagePath, {
@@ -206,30 +304,43 @@ export class BedrockApi implements LLMApi {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to generate image: ${res.statusText}`);
+        const errorText = await res.text();
+        console.error("[Bedrock Error]", errorText);
+        throw new Error(`Failed to generate media: ${errorText}`);
       }
 
       const data = await res.json();
 
-      // Extract image data based on model
-      let imageData;
-      if (params.model.includes("stability.stable-diffusion")) {
-        imageData = data.artifacts?.[0]?.base64;
-      } else if (params.model.includes("amazon.titan-image")) {
-        imageData = data.images?.[0];
-      } else if (params.model.includes("amazon.nova-canvas")) {
-        imageData = data.images?.[0];
+      // Handle async video generation
+      if (isVideoRequest) {
+        return {
+          invocationArn: data.invocationArn,
+          isVideo: true,
+          isAsync: true,
+        };
       }
 
-      if (!imageData) {
-        throw new Error("No image data in response");
+      // Handle synchronous image generation
+      let mediaData;
+      if (params.model.includes("stability.stable-diffusion")) {
+        mediaData = data.artifacts?.[0]?.base64;
+      } else if (params.model.includes("amazon.titan-image")) {
+        mediaData = data.images?.[0];
+      } else if (params.model.includes("amazon.nova-canvas")) {
+        mediaData = data.images?.[0];
+      }
+
+      if (!mediaData) {
+        throw new Error("No media data in response");
       }
 
       return {
-        base64: imageData,
+        base64: mediaData,
+        isVideo: false,
+        isAsync: false,
       };
     } catch (e) {
-      console.error("[Bedrock Image Generation Error]:", e);
+      console.error("[Bedrock Media Generation Error]:", e);
       throw e;
     }
   }
@@ -687,6 +798,7 @@ export class BedrockApi implements LLMApi {
             chatPath,
             JSON.stringify(finalRequestBody),
             shouldStream,
+            false,
           );
           const res = await fetch(chatPath, {
             method: "POST",
@@ -863,6 +975,7 @@ function bedrockStream(
       chatPath,
       JSON.stringify(requestPayload),
       shouldStream,
+      false, // Chat operations are never async
     );
     try {
       const res = await fetch(chatPath, {

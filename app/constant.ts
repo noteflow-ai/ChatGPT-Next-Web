@@ -245,15 +245,17 @@ export const Bedrock = {
     `https://bedrock-runtime.${region}.amazonaws.com`,
   ImageModels: {
     StableDiffusion: {
-      XL: "stability.stable-diffusion-xl",
-      XLV1: "stability.stable-diffusion-xl-v1",
+      SD3LargeV1: "stability.sd3-large-v1:0",
+      StableImageCoreV1: "stability.stable-image-core-v1:0",
+      StableImageUltraV1: "stability.stable-image-ultra-v1:0",
     },
     Titan: {
       V1: "amazon.titan-image-generator-v1",
       V2: "amazon.titan-image-generator-v2:0",
     },
-    NovaCanvas: {
-      V1: "amazon.nova-canvas-v1:0",
+    NovaCanvasAndReel: {
+      CanvasV1: "amazon.nova-canvas-v1:0",
+      NovaReel: "amazon.nova-reel-v1:0",
     },
   },
 };

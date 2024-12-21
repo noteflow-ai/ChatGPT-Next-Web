@@ -640,11 +640,19 @@ export function getBedrockEndpoint(
   region: string,
   modelId: string,
   shouldStream: boolean,
+  isAsync: boolean = false,
 ): string {
   if (!region || !modelId) {
     throw new Error("Region and model ID are required for Bedrock endpoint");
   }
   const baseEndpoint = `https://bedrock-runtime.${region}.amazonaws.com`;
+
+  // For async operations (like video generation)
+  if (isAsync) {
+    return `${baseEndpoint}/model/${modelId}/start-async-invoke`;
+  }
+
+  // For regular operations
   const endpoint =
     shouldStream === false
       ? `${baseEndpoint}/model/${modelId}/invoke`

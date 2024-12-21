@@ -32,16 +32,20 @@ export const params = [
     name: "Bedrock Model Version",
     value: "model",
     type: "select",
-    default: Bedrock.ImageModels.StableDiffusion.XL,
+    default: Bedrock.ImageModels.StableDiffusion.SD3LargeV1,
     support: ["bedrock-sd"],
     options: [
       {
-        name: "Stable Diffusion XL",
-        value: Bedrock.ImageModels.StableDiffusion.XL,
+        name: "SD3 Large V1",
+        value: Bedrock.ImageModels.StableDiffusion.SD3LargeV1,
       },
       {
-        name: "Stable Diffusion XL 1.0",
-        value: Bedrock.ImageModels.StableDiffusion.XLV1,
+        name: "Stable Image Core V1",
+        value: Bedrock.ImageModels.StableDiffusion.StableImageCoreV1,
+      },
+      {
+        name: "Stable Image Ultra V1",
+        value: Bedrock.ImageModels.StableDiffusion.StableImageUltraV1,
       },
     ],
   },
@@ -62,10 +66,17 @@ export const params = [
     name: "Nova Canvas Model Version",
     value: "model",
     type: "select",
-    default: Bedrock.ImageModels.NovaCanvas.V1,
+    default: Bedrock.ImageModels.NovaCanvasAndReel.CanvasV1,
     support: ["bedrock-nova"],
     options: [
-      { name: "Nova Canvas v1", value: Bedrock.ImageModels.NovaCanvas.V1 },
+      {
+        name: "Nova Canvas v1",
+        value: Bedrock.ImageModels.NovaCanvasAndReel.CanvasV1,
+      },
+      {
+        name: "Nova Reel",
+        value: Bedrock.ImageModels.NovaCanvasAndReel.NovaReel,
+      },
     ],
   },
   {
@@ -87,7 +98,7 @@ export const params = [
     value: "aspect_ratio",
     type: "select",
     default: "1:1",
-    support: ["ultra", "core", "sd3"],
+    support: ["ultra", "core", "sd3", "bedrock-sd"],
     options: [
       { name: "1:1", value: "1:1" },
       { name: "16:9", value: "16:9" },
@@ -106,7 +117,7 @@ export const params = [
     value: "size",
     type: "select",
     default: "1024x1024",
-    support: ["bedrock-sd", "bedrock-titan", "bedrock-nova"],
+    support: ["bedrock-titan", "bedrock-nova"],
     options: [
       { name: "1024x1024", value: "1024x1024" },
       { name: "1024x1792", value: "1024x1792" },
@@ -142,33 +153,6 @@ export const params = [
       { name: Locale.SdPanel.Styles.TileTexture, value: "tile-texture" },
     ],
   },
-  // Add Bedrock style preset options
-  {
-    name: "Style Preset",
-    value: "style_preset",
-    type: "select",
-    default: "photographic",
-    support: ["bedrock-sd"],
-    options: [
-      { name: "3D Model", value: "3d-model" },
-      { name: "Analog Film", value: "analog-film" },
-      { name: "Anime", value: "anime" },
-      { name: "Cinematic", value: "cinematic" },
-      { name: "Comic Book", value: "comic-book" },
-      { name: "Digital Art", value: "digital-art" },
-      { name: "Enhance", value: "enhance" },
-      { name: "Fantasy Art", value: "fantasy-art" },
-      { name: "Isometric", value: "isometric" },
-      { name: "Line Art", value: "line-art" },
-      { name: "Low Poly", value: "low-poly" },
-      { name: "Modeling Compound", value: "modeling-compound" },
-      { name: "Neon Punk", value: "neon-punk" },
-      { name: "Origami", value: "origami" },
-      { name: "Photographic", value: "photographic" },
-      { name: "Pixel Art", value: "pixel-art" },
-      { name: "Tile Texture", value: "tile-texture" },
-    ],
-  },
   {
     name: "Seed",
     value: "seed",
@@ -184,16 +168,6 @@ export const params = [
       "bedrock-titan",
       "bedrock-nova",
     ],
-  },
-  // Add Bedrock specific parameters
-  {
-    name: "CFG Scale",
-    value: "cfg_scale",
-    type: "number",
-    default: 7,
-    min: 0,
-    max: 35,
-    support: ["bedrock-sd"],
   },
   // Add Titan specific CFG Scale
   {
@@ -218,15 +192,6 @@ export const params = [
       { name: "Premium", value: "premium" },
     ],
   },
-  {
-    name: "Steps",
-    value: "steps",
-    type: "number",
-    default: 50,
-    min: 10,
-    max: 150,
-    support: ["bedrock-sd"],
-  },
   // Add Titan specific parameters
   {
     name: "Quality",
@@ -239,15 +204,15 @@ export const params = [
       { name: "Premium", value: "premium" },
     ],
   },
-  {
-    name: "Number of Images",
-    value: "numberOfImages",
-    type: "number",
-    default: 1,
-    min: 1,
-    max: 5,
-    support: ["bedrock-titan", "bedrock-nova"],
-  },
+  // {
+  //   name: "Number of Images",
+  //   value: "numberOfImages",
+  //   type: "number",
+  //   default: 1,
+  //   min: 1,
+  //   max: 5,
+  //   support: ["bedrock-titan", "bedrock-nova"],
+  // },
   {
     name: Locale.SdPanel.OutFormat,
     value: "output_format",

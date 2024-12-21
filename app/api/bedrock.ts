@@ -10,7 +10,7 @@ import { getServerSideConfig } from "../config/server";
 import { ModelProvider } from "../constant";
 import { prettyObject } from "../utils/format";
 
-const ALLOWED_PATH = new Set(["chat", "models", "images"]);
+const ALLOWED_PATH = new Set(["chat", "models", "images", "async-invoke"]);
 
 async function getBedrockCredentials(
   req: NextRequest,
@@ -66,6 +66,7 @@ async function requestBedrock(req: NextRequest) {
     const credentials = await getBedrockCredentials(req);
     const modelId = req.headers.get("XModelID");
     const shouldStream = req.headers.get("ShouldStream") !== "false";
+    const isAsync = req.headers.get("IsAsync") === "true";
 
     if (!modelId) {
       throw new Error("Missing model ID");
@@ -89,15 +90,8 @@ async function requestBedrock(req: NextRequest) {
       credentials.region,
       modelId,
       shouldStream,
+      isAsync,
     );
-
-    // // Handle image generation models
-    // if (modelId.includes("stability.stable-diffusion") || modelId.includes("amazon.titan-image")) {
-    //   bodyJson = {
-    //     ...bodyJson,
-    //     accept: "image/png",
-    //   };
-    // }
 
     // Sign request
     const headers = await sign({
@@ -112,6 +106,7 @@ async function requestBedrock(req: NextRequest) {
     });
 
     // Make request to AWS Bedrock
+    console.log("[Bedrock Request] endpoint:", endpoint);
     console.log(
       "[Bedrock Request] Final Body:",
       JSON.stringify(bodyJson, null, 2),
